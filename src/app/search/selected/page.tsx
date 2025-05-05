@@ -7,8 +7,6 @@ import { useEffect, useState } from 'react';
 
 // 검색 결과 탭 타입
 type SearchTabType = 'all' | 'title' | 'keyword';
-
-// 화면 모드
 type ViewMode = 'search' | 'fullContent';
 
 export default function SearchPage() {
@@ -30,7 +28,7 @@ export default function SearchPage() {
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
   const [showSelectedOnly, setShowSelectedOnly] = useState(false);
 
-  // 화면 모드 상태
+  // 보기 모드 상태
   const [viewMode, setViewMode] = useState<ViewMode>('search');
   const [selectedPostsData, setSelectedPostsData] = useState<Post[]>([]);
 
