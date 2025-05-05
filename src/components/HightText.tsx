@@ -3,25 +3,26 @@ import { FC } from 'react';
 interface HighlightTextProps {
   text: string;
   highlight: string;
-  className?: string;
   highlightClassName?: string;
 }
 
 const HighlightText: FC<HighlightTextProps> = ({
   text,
   highlight,
-  className = '',
   highlightClassName = 'bg-yellow-200',
 }) => {
   if (!highlight.trim()) {
-    return <span className={className}>{text}</span>;
+    return <span>{text}</span>;
   }
 
-  const regex = new RegExp(`(${highlight})`, 'gi');
+  const regex = new RegExp(
+    `(${highlight.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`,
+    'gi'
+  );
   const parts = text.split(regex);
 
   return (
-    <span className={className}>
+    <span>
       {parts.map((part, i) =>
         regex.test(part) ? (
           <span key={i} className={highlightClassName}>

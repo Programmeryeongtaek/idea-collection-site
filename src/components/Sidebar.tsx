@@ -41,7 +41,7 @@ export default function Sidebar() {
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="검색어를 입력하세요"
+                placeholder="검색어를 입력하세요 (쉼표로 구분)"
                 className="w-full rounded-l-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
               />
               <button
@@ -63,6 +63,9 @@ export default function Sidebar() {
                   />
                 </svg>
               </button>
+            </div>
+            <div className="text-xs text-gray-500 mt-1">
+              여러 키워드는 쉼표(,)로 구분
             </div>
           </form>
         </div>

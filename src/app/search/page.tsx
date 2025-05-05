@@ -7,13 +7,17 @@ import { useEffect, useState } from 'react';
 
 // 검색 결과 탭 타입
 type SearchTabType = 'all' | 'title' | 'keyword';
-
-// 화면 모드
 type ViewMode = 'search' | 'fullContent';
 
 export default function SearchPage() {
   const searchParams = useSearchParams();
   const searchTerm = searchParams.get('term') || '';
+
+  // 검색어 파싱 (쉼표로 구분)
+  const searchTerms = searchTerm
+    .split(',')
+    .map((term) => term.trim())
+    .filter((term) => term !== '');
 
   // 검색 결과
   const [titleResults, setTitleResults] = useState<Post[]>([]);
@@ -43,19 +47,25 @@ export default function SearchPage() {
       localStorage.getItem('posts') || '[]'
     ) as Post[];
 
-    // 제목으로 검색
+    // 제목으로 검색 - 여러 검색어 중 하나라도 포함되면 결과에 포함
     const titleMatches = savedPosts.filter((post) =>
-      post.title.toLowerCase().includes(searchTerm.toLowerCase())
+      searchTerms.some((term) =>
+        post.title.toLowerCase().includes(term.toLowerCase())
+      )
     );
-    setTitleResults(titleMatches);
 
-    // 키워드로 검색
+    // 키워드로 검색 - 여러 검색어 중 하나라도 키워드에 포함되면 결과에 포함
     const keywordMatches = savedPosts.filter(
       (post) =>
         post.keywords?.some((keyword) =>
-          keyword.toLowerCase().includes(searchTerm.toLowerCase())
+          searchTerms.some((term) =>
+            keyword.toLowerCase().includes(term.toLowerCase())
+          )
         ) ?? false
     );
+
+    // 결과 설정 및 집계
+    setTitleResults(titleMatches);
     setKeywordResults(keywordMatches);
 
     // 중복 제거한 전체 결과 개수 계산
@@ -204,6 +214,33 @@ export default function SearchPage() {
     setIsMultiSelectMode(!isMultiSelectMode);
   };
 
+  // 키워드 일치 여부 확인 함수
+  const isKeywordMatched = (keyword: string) => {
+    return searchTerms.some((term) =>
+      keyword.toLowerCase().includes(term.toLowerCase())
+    );
+  };
+
+  // 검색어와 키워드 하이라이트 함수
+  const highlightMatchedKeyword = (keyword: string) => {
+    // 일치하는 검색어 찾기
+    const matchingTerm = searchTerms.find((term) =>
+      keyword.toLowerCase().includes(term.toLowerCase())
+    );
+
+    if (matchingTerm) {
+      return (
+        <HighlightText
+          text={keyword}
+          highlight={matchingTerm}
+          highlightClassName="bg-yellow-200"
+        />
+      );
+    }
+
+    return keyword;
+  };
+
   return (
     <div className="w-full max-w-full">
       {viewMode === 'search' ? (
@@ -212,7 +249,7 @@ export default function SearchPage() {
           <div className="mb-6">
             <h1 className="text-2xl font-bold">검색 결과</h1>
             <p className="text-gray-600 mt-1">
-              검색어: {searchTerm} (총 {resultCounts.all}개의 결과)
+              검색어: {searchTerms.join(', ')} (총 {resultCounts.all}개의 결과)
             </p>
           </div>
 
@@ -320,10 +357,15 @@ export default function SearchPage() {
           ) : (
             <div className="space-y-4">
               {currentResults.map((post) => {
-                const matchesTitle = titleResults.some((p) => p.id === post.id);
-                const matchesKeyword = keywordResults.some(
-                  (p) => p.id === post.id
+                const matchesTitle = searchTerms.some((term) =>
+                  post.title.toLowerCase().includes(term.toLowerCase())
                 );
+                const matchesKeyword =
+                  post.keywords?.some((keyword) =>
+                    searchTerms.some((term) =>
+                      keyword.toLowerCase().includes(term.toLowerCase())
+                    )
+                  ) ?? false;
                 const isSelected = selectedPosts.has(post.id);
 
                 return (
@@ -368,11 +410,16 @@ export default function SearchPage() {
                         <div className="flex justify-between items-center mb-3">
                           <h3 className="text-xl font-medium">
                             {matchesTitle ? (
-                              <HighlightText
-                                text={post.title}
-                                highlight={searchTerm}
-                                highlightClassName="bg-yellow-200"
-                              />
+                              <>
+                                {searchTerms.map((term, idx) => (
+                                  <HighlightText
+                                    key={idx}
+                                    text={idx === 0 ? post.title : post.title}
+                                    highlight={term}
+                                    highlightClassName="bg-yellow-200"
+                                  />
+                                ))}
+                              </>
                             ) : (
                               post.title
                             )}
@@ -390,11 +437,7 @@ export default function SearchPage() {
                         {post.keywords && post.keywords.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-3 mb-2">
                             {post.keywords.map((keyword, index) => {
-                              const isHighlighted =
-                                matchesKeyword &&
-                                keyword
-                                  .toLowerCase()
-                                  .includes(searchTerm.toLowerCase());
+                              const isHighlighted = isKeywordMatched(keyword);
 
                               return (
                                 <span
@@ -405,7 +448,10 @@ export default function SearchPage() {
                                       : 'bg-gray-100 text-gray-600'
                                   }`}
                                 >
-                                  #{keyword}
+                                  #
+                                  {isHighlighted
+                                    ? highlightMatchedKeyword(keyword)
+                                    : keyword}
                                 </span>
                               );
                             })}
@@ -448,12 +494,20 @@ export default function SearchPage() {
               >
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-2xl font-bold">
-                    {searchTerm ? (
-                      <HighlightText
-                        text={post.title}
-                        highlight={searchTerm}
-                        highlightClassName="bg-yellow-200"
-                      />
+                    {searchTerms.length > 0 &&
+                    searchTerms.some((term) =>
+                      post.title.toLowerCase().includes(term.toLowerCase())
+                    ) ? (
+                      <>
+                        {searchTerms.map((term, idx) => (
+                          <HighlightText
+                            key={idx}
+                            text={idx === 0 ? post.title : post.title}
+                            highlight={term}
+                            highlightClassName="bg-yellow-200"
+                          />
+                        ))}
+                      </>
                     ) : (
                       post.title
                     )}
@@ -470,21 +524,27 @@ export default function SearchPage() {
                 {/* 키워드 표시 - 키워드가 있을 때만 */}
                 {post.keywords && post.keywords.length > 0 && (
                   <div className="flex flex-wrap gap-1 mt-4 mb-2">
-                    {post.keywords.map((keyword, idx) => (
-                      <span
-                        key={idx}
-                        className={`px-2 py-0.5 rounded-full text-xs ${
-                          searchTerm &&
-                          keyword
-                            .toLowerCase()
-                            .includes(searchTerm.toLowerCase())
-                            ? 'bg-yellow-200 text-yellow-800 font-medium'
-                            : 'bg-gray-100 text-gray-600 print:bg-gray-200'
-                        }`}
-                      >
-                        #{keyword}
-                      </span>
-                    ))}
+                    {post.keywords.map((keyword, idx) => {
+                      const isHighlighted = searchTerms.some((term) =>
+                        keyword.toLowerCase().includes(term.toLowerCase())
+                      );
+
+                      return (
+                        <span
+                          key={idx}
+                          className={`px-2 py-0.5 rounded-full text-xs ${
+                            isHighlighted
+                              ? 'bg-yellow-200 text-yellow-800 font-medium'
+                              : 'bg-gray-100 text-gray-600 print:bg-gray-200'
+                          }`}
+                        >
+                          #
+                          {isHighlighted
+                            ? highlightMatchedKeyword(keyword)
+                            : keyword}
+                        </span>
+                      );
+                    })}
                   </div>
                 )}
 
