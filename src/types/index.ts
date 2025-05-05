@@ -1,8 +1,9 @@
 export enum PostCategory {
   IDEA = '아이디어',
-  SENTENCE = '문장', // 기본값이지만 UI에는 표시하지 않음
-  QUOTE = '명언', // 문장의 서브 카테고리
-  VIDEO = '영상'
+  SENTENCE = '문장',
+  QUOTE = '명언',
+  VIDEO = '영상',
+  OTHER = '기타'
 }
 
 export interface Post {
@@ -13,4 +14,5 @@ export interface Post {
   createdAt: string;
 }
 
+// Omit을 사용한 타입 명시적 정의
 export type CreatePostData = Omit<Post, 'id' | 'createdAt'>;
