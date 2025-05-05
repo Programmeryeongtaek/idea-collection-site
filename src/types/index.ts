@@ -12,6 +12,7 @@ export interface Post {
   content: string;
   category: PostCategory;
   createdAt: string;
+  keywords?: string[];
 }
 
 // Omit을 사용한 타입 명시적 정의
