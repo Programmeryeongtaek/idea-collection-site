@@ -1,9 +1,8 @@
 'use client';
 
-import HighlightText from '@/components/HightText';
 import { Post } from '@/types';
 import { useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 // 검색 결과 탭 타입
 type SearchTabType = 'all' | 'title' | 'keyword';
@@ -13,11 +12,15 @@ export default function SearchPage() {
   const searchParams = useSearchParams();
   const searchTerm = searchParams.get('term') || '';
 
-  // 검색어 파싱 (쉼표로 구분)
-  const searchTerms = searchTerm
-    .split(',')
-    .map((term) => term.trim())
-    .filter((term) => term !== '');
+  // 검색어 파싱 (쉼표로 구분) - useMemo로 변경
+  const searchTerms = useMemo(
+    () =>
+      searchTerm
+        .split(',')
+        .map((term) => term.trim())
+        .filter((term) => term !== ''),
+    [searchTerm]
+  );
 
   // 검색 결과
   const [titleResults, setTitleResults] = useState<Post[]>([]);
@@ -34,58 +37,74 @@ export default function SearchPage() {
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
   const [showSelectedOnly, setShowSelectedOnly] = useState(false);
 
-  // 화면 모드 상태
+  // 보기 모드 상태
   const [viewMode, setViewMode] = useState<ViewMode>('search');
   const [selectedPostsData, setSelectedPostsData] = useState<Post[]>([]);
 
+  // 검색 결과를 한 번에 가져오는 함수 - useCallback으로 감싸기
+  const fetchSearchResults = useCallback(() => {
+    if (searchTerms.length === 0) return;
+
+    try {
+      // 로컬 스토리지에서 게시글 가져오기
+      const savedPosts = JSON.parse(
+        localStorage.getItem('posts') || '[]'
+      ) as Post[];
+
+      // 제목으로 검색
+      const titleMatches = savedPosts.filter((post) =>
+        searchTerms.some((term) =>
+          post.title.toLowerCase().includes(term.toLowerCase())
+        )
+      );
+
+      // 키워드로 검색
+      const keywordMatches = savedPosts.filter(
+        (post) =>
+          post.keywords?.some((keyword) =>
+            searchTerms.some((term) =>
+              keyword.toLowerCase().includes(term.toLowerCase())
+            )
+          ) ?? false
+      );
+
+      // 중복 제거한 전체 결과 개수 계산
+      const allResultsCount = new Set([
+        ...titleMatches.map((post) => post.id),
+        ...keywordMatches.map((post) => post.id),
+      ]).size;
+
+      return {
+        titleMatches,
+        keywordMatches,
+        allResultsCount,
+      };
+    } catch (error) {
+      console.error('검색 중 오류 발생:', error);
+      return null;
+    }
+  }, [searchTerms]);
+
   // 검색 실행
   useEffect(() => {
-    if (!searchTerm) return;
+    if (searchTerms.length === 0) return;
 
-    // 로컬 스토리지에서 게시글 가져오기
-    const savedPosts = JSON.parse(
-      localStorage.getItem('posts') || '[]'
-    ) as Post[];
+    const results = fetchSearchResults();
+    if (!results) return;
 
-    // 제목으로 검색 - 여러 검색어 중 하나라도 포함되면 결과에 포함
-    const titleMatches = savedPosts.filter((post) =>
-      searchTerms.some((term) =>
-        post.title.toLowerCase().includes(term.toLowerCase())
-      )
-    );
-
-    // 키워드로 검색 - 여러 검색어 중 하나라도 키워드에 포함되면 결과에 포함
-    const keywordMatches = savedPosts.filter(
-      (post) =>
-        post.keywords?.some((keyword) =>
-          searchTerms.some((term) =>
-            keyword.toLowerCase().includes(term.toLowerCase())
-          )
-        ) ?? false
-    );
-
-    // 결과 설정 및 집계
-    setTitleResults(titleMatches);
-    setKeywordResults(keywordMatches);
-
-    // 중복 제거한 전체 결과 개수 계산
-    const allResultsCount = new Set([
-      ...titleMatches.map((post) => post.id),
-      ...keywordMatches.map((post) => post.id),
-    ]).size;
-
-    // 결과 개수 설정
+    setTitleResults(results.titleMatches);
+    setKeywordResults(results.keywordMatches);
     setResultCounts({
-      all: allResultsCount,
-      title: titleMatches.length,
-      keyword: keywordMatches.length,
+      all: results.allResultsCount,
+      title: results.titleMatches.length,
+      keyword: results.keywordMatches.length,
     });
 
     // 선택 항목 초기화
     setSelectedPosts(new Set());
     setShowSelectedOnly(false);
     setViewMode('search');
-  }, [searchTerm]);
+  }, [fetchSearchResults, searchTerms]);
 
   // 선택한 항목들의 데이터를 로드
   useEffect(() => {
@@ -94,28 +113,32 @@ export default function SearchPage() {
       return;
     }
 
-    // 로컬 스토리지에서 게시글 가져오기
-    const savedPosts = JSON.parse(
-      localStorage.getItem('posts') || '[]'
-    ) as Post[];
+    try {
+      // 로컬 스토리지에서 게시글 가져오기
+      const savedPosts = JSON.parse(
+        localStorage.getItem('posts') || '[]'
+      ) as Post[];
 
-    // 선택한 ID에 해당하는 게시글만 필터링
-    const filteredPosts = savedPosts.filter((post) =>
-      selectedPosts.has(post.id)
-    );
-    setSelectedPostsData(filteredPosts);
+      // 선택한 ID에 해당하는 게시글만 필터링
+      const filteredPosts = savedPosts.filter((post) =>
+        selectedPosts.has(post.id)
+      );
+      setSelectedPostsData(filteredPosts);
+    } catch (error) {
+      console.error('선택 항목 로드 중 오류 발생:', error);
+    }
   }, [selectedPosts]);
 
-  // 현재 탭에 맞는 결과 필터링 및 정렬
-  const getFilteredResults = () => {
+  // 현재 탭에 맞는 결과 필터링 및 정렬 - useMemo로 변경
+  const currentResults = useMemo(() => {
     let results: Post[] = [];
 
     switch (activeTab) {
       case 'title':
-        results = titleResults;
+        results = [...titleResults];
         break;
       case 'keyword':
-        results = keywordResults;
+        results = [...keywordResults];
         break;
       case 'all':
       default:
@@ -173,73 +196,66 @@ export default function SearchPage() {
     }
 
     return results;
-  };
-
-  const currentResults = getFilteredResults();
+  }, [
+    activeTab,
+    titleResults,
+    keywordResults,
+    showSelectedOnly,
+    selectedPosts,
+  ]);
 
   // 항목 선택/해제 처리
-  const toggleSelection = (postId: string) => {
-    const newSelected = new Set(selectedPosts);
-    if (newSelected.has(postId)) {
-      newSelected.delete(postId);
-    } else {
-      newSelected.add(postId);
-    }
-    setSelectedPosts(newSelected);
-  };
+  const toggleSelection = useCallback((postId: string) => {
+    setSelectedPosts((prev) => {
+      const newSelected = new Set(prev);
+      if (newSelected.has(postId)) {
+        newSelected.delete(postId);
+      } else {
+        newSelected.add(postId);
+      }
+      return newSelected;
+    });
+  }, []);
 
   // 전체 선택/해제
-  const toggleSelectAll = () => {
-    if (selectedPosts.size === currentResults.length) {
-      // 전체 해제
-      setSelectedPosts(new Set());
-    } else {
-      // 전체 선택
-      const newSelected = new Set<string>();
-      currentResults.forEach((post) => {
-        newSelected.add(post.id);
-      });
-      setSelectedPosts(newSelected);
-    }
-  };
+  const toggleSelectAll = useCallback(() => {
+    setSelectedPosts((prev) => {
+      if (prev.size === currentResults.length) {
+        // 전체 해제
+        return new Set();
+      } else {
+        // 전체 선택
+        const newSelected = new Set<string>();
+        currentResults.forEach((post) => {
+          newSelected.add(post.id);
+        });
+        return newSelected;
+      }
+    });
+  }, [currentResults]);
 
   // 선택 모드 토글
-  const toggleMultiSelectMode = () => {
-    if (isMultiSelectMode) {
-      // 선택 모드 종료 시 선택 항목 초기화
-      setSelectedPosts(new Set());
-      setShowSelectedOnly(false);
-      setViewMode('search');
-    }
-    setIsMultiSelectMode(!isMultiSelectMode);
-  };
+  const toggleMultiSelectMode = useCallback(() => {
+    setIsMultiSelectMode((prev) => {
+      if (prev) {
+        // 선택 모드 종료 시 선택 항목 초기화
+        setSelectedPosts(new Set());
+        setShowSelectedOnly(false);
+        setViewMode('search');
+      }
+      return !prev;
+    });
+  }, []);
 
   // 키워드 일치 여부 확인 함수
-  const isKeywordMatched = (keyword: string) => {
-    return searchTerms.some((term) =>
-      keyword.toLowerCase().includes(term.toLowerCase())
-    );
-  };
-
-  // 검색어와 키워드 하이라이트 함수
-  const highlightMatchedKeyword = (keyword: string) => {
-    // 일치하는 검색어 찾기
-    const matchingTerm = searchTerms.find((term) =>
-      keyword.toLowerCase().includes(term.toLowerCase())
-    );
-
-    if (matchingTerm) {
-      return (
-        <HighlightText
-          text={keyword}
-          highlight={matchingTerm}
-          highlightClassName="bg-yellow-200"
-        />
+  const isKeywordMatched = useCallback(
+    (keyword: string) => {
+      return searchTerms.some((term) =>
+        keyword.toLowerCase().includes(term.toLowerCase())
       );
-    }
-
-    return keyword;
-  };
+    },
+    [searchTerms]
+  );
 
   return (
     <div className="w-full max-w-full">
@@ -279,7 +295,7 @@ export default function SearchPage() {
                   </button>
 
                   <button
-                    onClick={() => setShowSelectedOnly(!showSelectedOnly)}
+                    onClick={() => setShowSelectedOnly((prev) => !prev)}
                     className={`px-3 py-1 rounded-md text-sm ${
                       showSelectedOnly
                         ? 'bg-blue-100 text-blue-700 border border-blue-300'
@@ -408,22 +424,7 @@ export default function SearchPage() {
                         )}
 
                         <div className="flex justify-between items-center mb-3">
-                          <h3 className="text-xl font-medium">
-                            {matchesTitle ? (
-                              <>
-                                {searchTerms.map((term, idx) => (
-                                  <HighlightText
-                                    key={idx}
-                                    text={idx === 0 ? post.title : post.title}
-                                    highlight={term}
-                                    highlightClassName="bg-yellow-200"
-                                  />
-                                ))}
-                              </>
-                            ) : (
-                              post.title
-                            )}
-                          </h3>
+                          <h3 className="text-xl font-medium">{post.title}</h3>
                           <span className="px-3 py-1 bg-gray-100 rounded-full text-sm">
                             {post.category}
                           </span>
@@ -436,25 +437,18 @@ export default function SearchPage() {
                         {/* 키워드 표시 - 키워드가 있을 때만 */}
                         {post.keywords && post.keywords.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-3 mb-2">
-                            {post.keywords.map((keyword, index) => {
-                              const isHighlighted = isKeywordMatched(keyword);
-
-                              return (
-                                <span
-                                  key={index}
-                                  className={`px-2 py-0.5 rounded-full text-xs ${
-                                    isHighlighted
-                                      ? 'bg-yellow-200 text-yellow-800 font-medium'
-                                      : 'bg-gray-100 text-gray-600'
-                                  }`}
-                                >
-                                  #
-                                  {isHighlighted
-                                    ? highlightMatchedKeyword(keyword)
-                                    : keyword}
-                                </span>
-                              );
-                            })}
+                            {post.keywords.map((keyword, index) => (
+                              <span
+                                key={index}
+                                className={`px-2 py-0.5 rounded-full text-xs ${
+                                  isKeywordMatched(keyword)
+                                    ? 'bg-yellow-200 text-yellow-800 font-medium'
+                                    : 'bg-gray-100 text-gray-600'
+                                }`}
+                              >
+                                #{keyword}
+                              </span>
+                            ))}
                           </div>
                         )}
 
@@ -493,25 +487,7 @@ export default function SearchPage() {
                 className="bg-white rounded-lg shadow-lg p-8 w-full border border-gray-100 print:shadow-none print:break-inside-avoid"
               >
                 <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-2xl font-bold">
-                    {searchTerms.length > 0 &&
-                    searchTerms.some((term) =>
-                      post.title.toLowerCase().includes(term.toLowerCase())
-                    ) ? (
-                      <>
-                        {searchTerms.map((term, idx) => (
-                          <HighlightText
-                            key={idx}
-                            text={idx === 0 ? post.title : post.title}
-                            highlight={term}
-                            highlightClassName="bg-yellow-200"
-                          />
-                        ))}
-                      </>
-                    ) : (
-                      post.title
-                    )}
-                  </h2>
+                  <h2 className="text-2xl font-bold">{post.title}</h2>
                   <span className="px-3 py-1 bg-gray-100 rounded-full text-sm print:bg-gray-200">
                     {post.category}
                   </span>
@@ -524,27 +500,18 @@ export default function SearchPage() {
                 {/* 키워드 표시 - 키워드가 있을 때만 */}
                 {post.keywords && post.keywords.length > 0 && (
                   <div className="flex flex-wrap gap-1 mt-4 mb-2">
-                    {post.keywords.map((keyword, idx) => {
-                      const isHighlighted = searchTerms.some((term) =>
-                        keyword.toLowerCase().includes(term.toLowerCase())
-                      );
-
-                      return (
-                        <span
-                          key={idx}
-                          className={`px-2 py-0.5 rounded-full text-xs ${
-                            isHighlighted
-                              ? 'bg-yellow-200 text-yellow-800 font-medium'
-                              : 'bg-gray-100 text-gray-600 print:bg-gray-200'
-                          }`}
-                        >
-                          #
-                          {isHighlighted
-                            ? highlightMatchedKeyword(keyword)
-                            : keyword}
-                        </span>
-                      );
-                    })}
+                    {post.keywords.map((keyword, idx) => (
+                      <span
+                        key={idx}
+                        className={`px-2 py-0.5 rounded-full text-xs ${
+                          isKeywordMatched(keyword)
+                            ? 'bg-yellow-200 text-yellow-800 font-medium'
+                            : 'bg-gray-100 text-gray-600 print:bg-gray-200'
+                        }`}
+                      >
+                        #{keyword}
+                      </span>
+                    ))}
                   </div>
                 )}
 
