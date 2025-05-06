@@ -1,5 +1,6 @@
 'use client';
 
+import { getAllPosts, getPostsByCategory } from '@/lib/api';
 import { Post, PostCategory } from '@/types';
 import { useEffect, useState } from 'react';
 
@@ -9,18 +10,46 @@ interface PostListProps {
 
 export default function PostList({ category }: PostListProps) {
   const [posts, setPosts] = useState<Post[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // localStorage에서 게시글 가져오기
-    const savedPosts = JSON.parse(localStorage.getItem('posts') || '[]');
+    async function loadPosts() {
+      setLoading(true);
+      try {
+        let fetchedPosts;
+        if (category) {
+          fetchedPosts = await getPostsByCategory(category);
+        } else {
+          fetchedPosts = await getAllPosts();
+        }
+        setPosts(fetchedPosts);
+      } catch (error) {
+        console.error('게시글을 불러오는 중 오류 발생:', error);
+        setError('게시글을 불러오는데 실패헀습니다. 다시 시도해주세요.');
+      } finally {
+        setLoading(false);
+      }
+    }
 
-    // 카테고리 필터링
-    const filteredPosts = category
-      ? savedPosts.filter((post: Post) => post.category === category)
-      : savedPosts;
-
-    setPosts(filteredPosts);
+    loadPosts();
   }, [category]);
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-lg shadow p-6 text-center w-full">
+        <p className="text-gray-500">게시글을 불러오는 중...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-white rounded-lg shadow p-6 text-center w-full">
+        <p className="text-red-500">{error}</p>
+      </div>
+    );
+  }
 
   if (posts.length === 0) {
     return (
@@ -61,7 +90,7 @@ export default function PostList({ category }: PostListProps) {
           )}
 
           <p className="text-gray-500 text-sm mt-2">
-            {new Date(post.createdAt).toLocaleString('ko-KR')}
+            {new Date(post.created_at).toLocaleString('ko-KR')}
           </p>
         </div>
       ))}

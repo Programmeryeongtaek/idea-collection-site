@@ -1,5 +1,6 @@
 'use client';
 
+import { searchWithMultipleTerms } from '@/lib/search';
 import { Post } from '@/types';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -11,6 +12,8 @@ type ViewMode = 'search' | 'fullContent';
 export default function SearchPage() {
   const searchParams = useSearchParams();
   const searchTerm = searchParams.get('term') || '';
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // 검색어 파싱 (쉼표로 구분) - useMemo로 변경
   const searchTerms = useMemo(
@@ -42,68 +45,48 @@ export default function SearchPage() {
   const [selectedPostsData, setSelectedPostsData] = useState<Post[]>([]);
 
   // 검색 결과를 한 번에 가져오는 함수 - useCallback으로 감싸기
-  const fetchSearchResults = useCallback(() => {
-    if (searchTerms.length === 0) return;
+  const fetchSearchResults = useCallback(async () => {
+    if (searchTerms.length === 0) {
+      setLoading(false);
+      return null;
+    }
+
+    setLoading(true);
+    setError(null);
 
     try {
-      // 로컬 스토리지에서 게시글 가져오기
-      const savedPosts = JSON.parse(
-        localStorage.getItem('posts') || '[]'
-      ) as Post[];
+      const results = await searchWithMultipleTerms(searchTerms);
 
-      // 제목으로 검색
-      const titleMatches = savedPosts.filter((post) =>
-        searchTerms.some((term) =>
-          post.title.toLowerCase().includes(term.toLowerCase())
-        )
-      );
+      setTitleResults(results.titleResults);
+      setKeywordResults(results.keywordResults);
+      setResultCounts(results.resultCounts);
 
-      // 키워드로 검색
-      const keywordMatches = savedPosts.filter(
-        (post) =>
-          post.keywords?.some((keyword) =>
-            searchTerms.some((term) =>
-              keyword.toLowerCase().includes(term.toLowerCase())
-            )
-          ) ?? false
-      );
+      // 선택 항목 초기화
+      setSelectedPosts(new Set());
+      setShowSelectedOnly(false);
+      setViewMode('search');
 
-      // 중복 제거한 전체 결과 개수 계산
-      const allResultsCount = new Set([
-        ...titleMatches.map((post) => post.id),
-        ...keywordMatches.map((post) => post.id),
-      ]).size;
-
-      return {
-        titleMatches,
-        keywordMatches,
-        allResultsCount,
-      };
+      setLoading(false);
+      return results;
     } catch (error) {
       console.error('검색 중 오류 발생:', error);
+      setError('검색 중 오류가 발생했습니다. 다시 시도해주세요.');
+      setLoading(false);
       return null;
     }
   }, [searchTerms]);
 
   // 검색 실행
   useEffect(() => {
-    if (searchTerms.length === 0) return;
+    const doSearch = async () => {
+      if (searchTerms.length === 0) {
+        setLoading(false);
+        return;
+      }
+      await fetchSearchResults();
+    };
 
-    const results = fetchSearchResults();
-    if (!results) return;
-
-    setTitleResults(results.titleMatches);
-    setKeywordResults(results.keywordMatches);
-    setResultCounts({
-      all: results.allResultsCount,
-      title: results.titleMatches.length,
-      keyword: results.keywordMatches.length,
-    });
-
-    // 선택 항목 초기화
-    setSelectedPosts(new Set());
-    setShowSelectedOnly(false);
-    setViewMode('search');
+    doSearch();
   }, [fetchSearchResults, searchTerms]);
 
   // 선택한 항목들의 데이터를 로드
@@ -114,20 +97,18 @@ export default function SearchPage() {
     }
 
     try {
-      // 로컬 스토리지에서 게시글 가져오기
-      const savedPosts = JSON.parse(
-        localStorage.getItem('posts') || '[]'
-      ) as Post[];
-
-      // 선택한 ID에 해당하는 게시글만 필터링
-      const filteredPosts = savedPosts.filter((post) =>
-        selectedPosts.has(post.id)
+      // 선택한 게시글 데이터 구성
+      const filteredPosts = [...titleResults, ...keywordResults].filter(
+        (post, index, self) =>
+          selectedPosts.has(post.id) &&
+          index === self.findIndex((p) => p.id === post.id)
       );
+
       setSelectedPostsData(filteredPosts);
     } catch (error) {
       console.error('선택 항목 로드 중 오류 발생:', error);
     }
-  }, [selectedPosts]);
+  }, [selectedPosts, titleResults, keywordResults]);
 
   // 현재 탭에 맞는 결과 필터링 및 정렬 - useMemo로 변경
   const currentResults = useMemo(() => {
@@ -184,9 +165,10 @@ export default function SearchPage() {
           }
 
           // 최신순 정렬 (기본)
-          return (
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          );
+          // created_at 또는 createdAt 속성 중 하나를 사용
+          const dateA = a.created_at || a.createdAt || '';
+          const dateB = b.created_at || b.createdAt || '';
+          return new Date(dateB).getTime() - new Date(dateA).getTime();
         });
     }
 
@@ -257,9 +239,32 @@ export default function SearchPage() {
     [searchTerms]
   );
 
+  // 날짜 포맷 함수
+  const formatDate = useCallback((dateString: string | undefined) => {
+    if (!dateString) return '';
+    return new Date(dateString).toLocaleString('ko-KR');
+  }, []);
+
   return (
     <div className="w-full max-w-full">
-      {viewMode === 'search' ? (
+      {loading ? (
+        // 로딩 상태 표시
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
+          <p className="ml-3 text-gray-600">검색 중...</p>
+        </div>
+      ) : error ? (
+        // 오류 표시
+        <div className="bg-red-50 text-red-700 p-4 rounded-lg shadow">
+          <p>{error}</p>
+          <button
+            onClick={() => fetchSearchResults()}
+            className="mt-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+          >
+            다시 시도
+          </button>
+        </div>
+      ) : viewMode === 'search' ? (
         // 검색 결과 보기
         <>
           <div className="mb-6">
@@ -453,7 +458,7 @@ export default function SearchPage() {
                         )}
 
                         <p className="text-gray-500 text-sm mt-2">
-                          {new Date(post.createdAt).toLocaleString('ko-KR')}
+                          {formatDate(post.created_at || post.createdAt)}
                         </p>
                       </div>
                     </div>
@@ -516,7 +521,7 @@ export default function SearchPage() {
                 )}
 
                 <p className="text-gray-500 text-sm mt-4">
-                  {new Date(post.createdAt).toLocaleString('ko-KR')}
+                  {formatDate(post.created_at || post.createdAt)}
                 </p>
 
                 {/* 항목 구분선 - 마지막 항목 제외 */}

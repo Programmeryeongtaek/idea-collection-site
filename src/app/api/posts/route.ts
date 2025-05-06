@@ -1,19 +1,49 @@
 // 실제로는 데이터베이스에 저장
 
-import { Post } from '@/types';
+import { supabase } from '@/lib/supabase';
 import { NextResponse } from 'next/server';
 
-// 임시로 메모리 저장소로 대체
-let posts: Post[] = [];
+export async function GET(request: Request) {
+  const url = new URL(request.url);
+  const category = url.searchParams.get('category');
+  const searchTerm = url.searchParams.get('search');
+  const keyword = url.searchParams.get('keyword');
 
-export async function GET() {
-  return NextResponse.json(posts);
+  let query = supabase.from('posts').select('*');
+
+  if (category) {
+    query = query.eq('category', category);
+  }
+
+  if (searchTerm) {
+    query = query.textSearch('search_vector', searchTerm, {
+      type: 'websearch',
+      config: 'korean',
+    });
+  }
+
+  if (keyword) {
+    query = query.contains('keywords', [keyword]);
+  }
+
+  const { data, error } = await query.order('created_at', { ascending: false });
+
+  if (error) {
+    return NextResponse.json(data);
+  }
 }
 
 export async function POST(request: Request) {
-  const newPost = await request.json();
+  const body = await request.json();
 
-  posts = [newPost, ...posts];
+  const { data, error } = await supabase
+    .from('posts')
+    .insert([body])
+    .select()
 
-  return NextResponse.json(newPost, { status: 200 });
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json(data[0]);
 }

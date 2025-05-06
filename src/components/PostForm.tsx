@@ -8,9 +8,10 @@ import { useRouter } from 'next/navigation';
 
 interface PostFormProps {
   onSubmit: (post: CreatePostData) => void;
+  initialLoading?: boolean;
 }
 
-const PostForm: FC<PostFormProps> = ({ onSubmit }) => {
+const PostForm: FC<PostFormProps> = ({ onSubmit, initialLoading = false }) => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [category, setCategory] = useState<PostCategory | null>(null);
@@ -19,13 +20,14 @@ const PostForm: FC<PostFormProps> = ({ onSubmit }) => {
   const [toastType, setToastType] = useState<
     'info' | 'success' | 'warning' | 'error'
   >('warning');
+  const [loading, setLoading] = useState(initialLoading);
   const router = useRouter();
 
   // 키워드 관련 상태
   const [keywords, setKeywords] = useState<string[]>([]);
   const [keywordInput, setKeywordInput] = useState('');
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
     // 카테고리 선택 확인
@@ -38,15 +40,25 @@ const PostForm: FC<PostFormProps> = ({ onSubmit }) => {
       return;
     }
 
-    onSubmit({
-      title,
-      content,
-      category: category || PostCategory.OTHER,
-      keywords, // 키워드 배열 추가
-    });
+    setLoading(true);
 
-    // 카테고리에 따라 해당 페이지로 리다이렉트
-    navigateToCategoryPage(category);
+    try {
+      await onSubmit({
+        title,
+        content,
+        category: category || PostCategory.OTHER,
+        keywords, // 키워드 배열 추가
+      });
+
+      // 카테고리에 따라 해당 페이지로 리다이렉트
+      navigateToCategoryPage(category);
+    } catch (error) {
+      console.error('게시글 저장 중 오류:', error);
+      setToastMessage('게시글 저장 중 오류가 발생했습니다.');
+      setToastType('error');
+      setShowToast(true);
+      setLoading(false);
+    }
   };
 
   const navigateToCategoryPage = (category: PostCategory) => {
@@ -121,6 +133,7 @@ const PostForm: FC<PostFormProps> = ({ onSubmit }) => {
         onSubmit={handleSubmit}
         className="w-full space-y-4 bg-white shadow rounded-lg p-6"
       >
+        {/* 기존 코드와 동일... */}
         <div>
           <label
             htmlFor="title"
@@ -135,6 +148,7 @@ const PostForm: FC<PostFormProps> = ({ onSubmit }) => {
             onChange={(e) => setTitle(e.target.value)}
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
             required
+            disabled={loading}
           />
         </div>
 
@@ -151,6 +165,7 @@ const PostForm: FC<PostFormProps> = ({ onSubmit }) => {
                   : 'bg-gray-200'
               }`}
               onClick={() => setCategory(PostCategory.IDEA)}
+              disabled={loading}
             >
               {PostCategory.IDEA}
             </button>
@@ -163,6 +178,7 @@ const PostForm: FC<PostFormProps> = ({ onSubmit }) => {
                   : 'bg-gray-200'
               }`}
               onClick={() => setCategory(PostCategory.SENTENCE)}
+              disabled={loading}
             >
               {PostCategory.SENTENCE}
             </button>
@@ -175,6 +191,7 @@ const PostForm: FC<PostFormProps> = ({ onSubmit }) => {
                   : 'bg-gray-200'
               }`}
               onClick={() => setCategory(PostCategory.QUOTE)}
+              disabled={loading}
             >
               {PostCategory.QUOTE}
             </button>
@@ -187,6 +204,7 @@ const PostForm: FC<PostFormProps> = ({ onSubmit }) => {
                   : 'bg-gray-200'
               }`}
               onClick={() => setCategory(PostCategory.VIDEO)}
+              disabled={loading}
             >
               {PostCategory.VIDEO}
             </button>
@@ -199,6 +217,7 @@ const PostForm: FC<PostFormProps> = ({ onSubmit }) => {
                   : 'bg-gray-200'
               }`}
               onClick={() => setCategory(PostCategory.OTHER)}
+              disabled={loading}
             >
               {PostCategory.OTHER}
             </button>
@@ -219,6 +238,7 @@ const PostForm: FC<PostFormProps> = ({ onSubmit }) => {
             rows={5}
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
             required
+            disabled={loading}
           />
         </div>
 
@@ -235,11 +255,13 @@ const PostForm: FC<PostFormProps> = ({ onSubmit }) => {
               onKeyPress={handleKeywordKeyPress}
               className="flex-1 rounded-l-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
               placeholder="키워드를 입력하고 Enter 또는 추가 버튼을 클릭하세요"
+              disabled={loading}
             />
             <button
               type="button"
               onClick={addKeyword}
               className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-r-md text-white bg-indigo-600 hover:bg-indigo-700"
+              disabled={loading}
             >
               추가
             </button>
@@ -258,6 +280,7 @@ const PostForm: FC<PostFormProps> = ({ onSubmit }) => {
                     type="button"
                     onClick={() => removeKeyword(index)}
                     className="ml-1 text-gray-500 hover:text-gray-700"
+                    disabled={loading}
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
@@ -286,13 +309,16 @@ const PostForm: FC<PostFormProps> = ({ onSubmit }) => {
         <div className="flex gap-2">
           <button
             type="submit"
-            className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+            className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300"
+            disabled={loading}
           >
-            게시하기
+            {loading ? '저장 중...' : '게시하기'}
           </button>
           <Link
             href="/"
-            className="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+            className={`inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 ${
+              loading ? 'pointer-events-none opacity-50' : ''
+            }`}
           >
             취소
           </Link>

@@ -11,9 +11,10 @@ export interface Post {
   title: string;
   content: string;
   category: PostCategory;
-  createdAt: string;
+  created_at: string; // Supabase에서는 created_at 형식으로 사용
+  createdAt?: string; // 이전 코드와의 호환성을 위해 유지
   keywords?: string[];
 }
 
 // Omit을 사용한 타입 명시적 정의
-export type CreatePostData = Omit<Post, 'id' | 'createdAt'>;
+export type CreatePostData = Omit<Post, 'id' | 'created_at' |'createdAt'>;
