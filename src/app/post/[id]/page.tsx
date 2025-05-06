@@ -136,7 +136,7 @@ export default function PostDetailPage() {
     if (!post) return [];
 
     // Post 타입이 VideoPost로 확정된 경우에만 videoUrls에 접근
-    if (post.category === PostCategory.VIDEO && 'videoUrls' in post) {
+    if (post.category === PostCategory.VIDEO && 'video_urls' in post) {
       return post.video_urls;
     }
 
