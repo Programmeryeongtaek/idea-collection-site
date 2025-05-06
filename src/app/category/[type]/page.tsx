@@ -12,22 +12,19 @@ const validCategories = {
   other: PostCategory.OTHER,
 };
 
-type CategoryPageProps = {
-  params: {
-    type: string;
-  };
-};
+export default async function CategoryPage({
+  params,
+}: {
+  params: { type: string };
+}) {
+  // params 객체를 await로 비동기 접근
+  const { type } = await params;
 
-export default function CategoryPage({ params }: CategoryPageProps) {
-  // 카테고리 타입 확인 및 변환
-  const categoryType = params.type;
-
-  if (!Object.keys(validCategories).includes(categoryType)) {
+  if (!Object.keys(validCategories).includes(type)) {
     return notFound();
   }
 
-  const category =
-    validCategories[categoryType as keyof typeof validCategories];
+  const category = validCategories[type as keyof typeof validCategories];
 
   return (
     <div className="w-full max-w-full">
