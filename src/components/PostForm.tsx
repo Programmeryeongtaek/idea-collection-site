@@ -12,6 +12,16 @@ interface PostFormProps {
   initialLoading?: boolean;
 }
 
+// 문장 타입 정의
+type SentenceType = 'general' | 'book';
+
+// 문장 아이템 인터페이스
+interface SentenceItem {
+  id: string;
+  text: string;
+  page?: number;
+}
+
 // 비디오 카테고리 제출 데이터
 interface VideoPostData {
   title: string;
@@ -28,9 +38,6 @@ interface NonVideoPostData {
   category: Exclude<PostCategory, PostCategory.VIDEO>;
   keywords?: string[];
 }
-
-// 조합 타입
-type PostSubmitData = VideoPostData | NonVideoPostData;
 
 const PostForm: FC<PostFormProps> = ({
   onSubmit,
@@ -63,6 +70,12 @@ const PostForm: FC<PostFormProps> = ({
     initialData?.keywords || []
   );
   const [keywordInput, setKeywordInput] = useState('');
+
+  // 문장 관련 새로운 상태
+  const [sentenceType, setSentenceType] = useState<SentenceType>('general');
+  const [sentences, setSentences] = useState<SentenceItem[]>([]);
+  const [currentSentence, setCurrentSentence] = useState('');
+  const [currentPage, setCurrentPage] = useState<string>('');
 
   // URL 검증 함수
   const isValidUrl = (url: string): boolean => {
@@ -122,6 +135,65 @@ const PostForm: FC<PostFormProps> = ({
     }
   };
 
+  // 문장 추가
+  const addSentence = () => {
+    if (!currentSentence.trim()) {
+      setToastMessage('문장을 입력해주세요.');
+      setToastType('warning');
+      setShowToast(true);
+      return;
+    }
+
+    // 도서 문장인 경우 쪽수 검증
+    if (sentenceType === 'book' && !currentPage) {
+      setToastMessage('쪽수를 입력해주세요.');
+      setToastType('warning');
+      setShowToast(true);
+      return;
+    }
+
+    // 새 문장 아이템 생성
+    const newSentenceItem: SentenceItem = {
+      id: Date.now().toString(), // 간단한 고유 ID 생성
+      text: currentSentence,
+      ...(sentenceType === 'book' && { page: parseInt(currentPage) }),
+    };
+
+    // 문장 추가
+    setSentences([...sentences, newSentenceItem]);
+
+    // 입력 필드 초기화
+    setCurrentSentence('');
+    if (sentenceType === 'book') {
+      setCurrentPage('');
+    }
+  };
+
+  // 문장 삭제
+  const removeSentence = (idToRemove: string) => {
+    setSentences(sentences.filter((item) => item.id !== idToRemove));
+  };
+
+  // 문장 입력창에서 엔터 키 처리
+  const handleSentenceKeyPress = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && e.ctrlKey) {
+      e.preventDefault(); // 폼 제출 방지
+      addSentence();
+    }
+  };
+
+  // 문장 배열을 콘텐츠로 변환
+  const sentencesToContent = (): string => {
+    return sentences
+      .map((item) => {
+        if (sentenceType === 'book' && item.page) {
+          return `p.${item.page} \n${item.text}`;
+        }
+        return item.text;
+      })
+      .join('\n\n');
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
@@ -143,33 +215,47 @@ const PostForm: FC<PostFormProps> = ({
       return;
     }
 
+    // 문장 카테고리일 때 최소 1개 이상의 문장 필요
+    if (category === PostCategory.SENTENCE && sentences.length === 0) {
+      // 기존 content가 있다면 허용
+      if (!content.trim()) {
+        setToastMessage('최소 1개 이상의 문장을 입력해주세요.');
+        setToastType('warning');
+        setShowToast(true);
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
-      // 제출 데이터 준비
-      let postData: PostSubmitData;
+      // 문장 카테고리인 경우 문장 배열을 콘텐츠로 변환
+      let finalContent = content;
+      if (category === PostCategory.SENTENCE && sentences.length > 0) {
+        finalContent = sentencesToContent();
+      }
 
-      // 영상 카테고리인 경우
+      // 제출 데이터 준비
       if (category === PostCategory.VIDEO) {
-        postData = {
+        // 영상 카테고리인 경우
+        const videoPostData: VideoPostData = {
           title,
-          content,
-          category,
+          content: finalContent,
+          category: PostCategory.VIDEO,
           keywords: keywords.length > 0 ? keywords : undefined,
           video_urls: videoUrls,
         };
+        await onSubmit(videoPostData as CreatePostData);
       } else {
         // 영상이 아닌 카테고리
-        postData = {
+        const nonVideoPostData: NonVideoPostData = {
           title,
-          content,
-          category,
+          content: finalContent,
+          category: category as Exclude<PostCategory, PostCategory.VIDEO>,
           keywords: keywords.length > 0 ? keywords : undefined,
         };
+        await onSubmit(nonVideoPostData as CreatePostData);
       }
-
-      // 제출
-      await onSubmit(postData as CreatePostData);
     } catch (error) {
       console.error('게시글 저장 중 오류:', error);
       setToastMessage('게시글 저장 중 오류가 발생했습니다.');
@@ -314,6 +400,160 @@ const PostForm: FC<PostFormProps> = ({
           </div>
         </div>
 
+        {/* 문장 카테고리 선택 시 도서/일반 선택 표시 */}
+        {category === PostCategory.SENTENCE && (
+          <div className="transition-all duration-300 ease-in-out space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                문장 유형
+              </label>
+              <div className="flex space-x-4">
+                <label className="inline-flex items-center">
+                  <input
+                    type="radio"
+                    className="form-radio text-indigo-600"
+                    checked={sentenceType === 'general'}
+                    onChange={() => setSentenceType('general')}
+                    disabled={loading}
+                  />
+                  <span className="ml-2">일반</span>
+                </label>
+                <label className="inline-flex items-center">
+                  <input
+                    type="radio"
+                    className="form-radio text-indigo-600"
+                    checked={sentenceType === 'book'}
+                    onChange={() => setSentenceType('book')}
+                    disabled={loading}
+                  />
+                  <span className="ml-2">도서</span>
+                </label>
+              </div>
+            </div>
+
+            {/* 문장 추가 필드 */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                문장 추가
+              </label>
+              <div className="flex flex-col space-y-2">
+                {sentenceType === 'book' && (
+                  <div className="flex">
+                    <input
+                      type="number"
+                      placeholder="쪽수"
+                      value={currentPage}
+                      onChange={(e) => setCurrentPage(e.target.value)}
+                      className="w-24 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 mr-2"
+                      disabled={loading}
+                      min="1"
+                    />
+                    <textarea
+                      placeholder="문장을 입력하세요 (Ctrl+Enter로 추가)"
+                      value={currentSentence}
+                      onChange={(e) => setCurrentSentence(e.target.value)}
+                      onKeyPress={handleSentenceKeyPress}
+                      className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      rows={2}
+                      disabled={loading}
+                    />
+                    <button
+                      type="button"
+                      onClick={addSentence}
+                      className="ml-2 inline-flex items-center px-3 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300"
+                      disabled={
+                        loading ||
+                        !currentSentence.trim() ||
+                        (sentenceType === 'book' && !currentPage)
+                      }
+                    >
+                      추가
+                    </button>
+                  </div>
+                )}
+
+                {sentenceType === 'general' && (
+                  <div className="flex">
+                    <textarea
+                      placeholder="문장을 입력하세요 (Ctrl+Enter로 추가)"
+                      value={currentSentence}
+                      onChange={(e) => setCurrentSentence(e.target.value)}
+                      onKeyPress={handleSentenceKeyPress}
+                      className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      rows={2}
+                      disabled={loading}
+                    />
+                    <button
+                      type="button"
+                      onClick={addSentence}
+                      className="ml-2 inline-flex items-center px-3 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300"
+                      disabled={loading || !currentSentence.trim()}
+                    >
+                      추가
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <p className="text-xs text-gray-500">
+                문장을 입력한 후 추가 버튼을 클릭하거나 Ctrl+Enter를 누르세요.
+              </p>
+            </div>
+
+            {/* 추가된 문장 목록 */}
+            {sentences.length > 0 && (
+              <div className="mt-4 space-y-2">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-sm font-medium text-gray-700">
+                    추가된 문장
+                  </h3>
+                  <span className="text-xs text-gray-500">
+                    {sentences.length}개 추가됨
+                  </span>
+                </div>
+                <div className="bg-gray-50 p-3 rounded-md space-y-2">
+                  {sentences.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex items-start bg-white p-3 rounded border border-gray-200"
+                    >
+                      <div className="flex-1">
+                        {sentenceType === 'book' && item.page && (
+                          <div className="mb-1 text-xs font-medium text-gray-500">
+                            p.{item.page}
+                          </div>
+                        )}
+                        <p className="text-gray-800">{item.text}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeSentence(item.id)}
+                        className="ml-2 text-red-500 hover:text-red-700"
+                        disabled={loading}
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-5 w-5"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* 영상 카테고리 선택 시 URL 입력 필드 표시 */}
         {category === PostCategory.VIDEO && (
           <div className="transition-all duration-300 ease-in-out space-y-4">
@@ -401,23 +641,26 @@ const PostForm: FC<PostFormProps> = ({
           </div>
         )}
 
-        <div>
-          <label
-            htmlFor="content"
-            className="block text-sm font-medium text-gray-700"
-          >
-            내용
-          </label>
-          <textarea
-            id="content"
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            rows={5}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-            required
-            disabled={loading}
-          />
-        </div>
+        {/* 문장 카테고리가 아니거나 문장을 추가하지 않은 경우에만 내용 입력 필드 표시 */}
+        {(category !== PostCategory.SENTENCE || sentences.length === 0) && (
+          <div>
+            <label
+              htmlFor="content"
+              className="block text-sm font-medium text-gray-700"
+            >
+              내용
+            </label>
+            <textarea
+              id="content"
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              rows={5}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              required={category !== PostCategory.SENTENCE}
+              disabled={loading}
+            />
+          </div>
+        )}
 
         {/* 키워드 입력 섹션 */}
         <div>
