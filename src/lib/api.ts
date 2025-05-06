@@ -65,6 +65,27 @@ export async function deletePost(postId: string): Promise<boolean> {
   return true;
 }
 
+// 다중 게시글 삭제하기
+export async function deleteMultiplePosts(postIds: string[]): Promise<{success: boolean; count: number}> {
+  // postIds가 비어있으면 바로 반환
+  if (!postIds.length) {
+    return { success: true, count: 0 };
+  }
+
+  const { data, error } = await supabase
+    .from('posts')
+    .delete()
+    .in('id', postIds)
+    .select('id');
+
+  if (error) {
+    console.error('Error deleting posts:', error);
+    return { success: false, count: 0 };
+  }
+
+  return { success: true, count: data?.length || 0 };
+}
+
 // 게시글 수정하기
 export async function updatePost(postId: string, postData: Partial<CreatePostData>): Promise<Post | null> {
   const { data, error } = await supabase

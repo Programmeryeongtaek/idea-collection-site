@@ -4,27 +4,36 @@ import { CreatePostData, PostCategory } from '@/types';
 import Link from 'next/link';
 import { FC, FormEvent, KeyboardEvent, useState } from 'react';
 import Toast from './Toast';
-import { useRouter } from 'next/navigation';
 
 interface PostFormProps {
-  onSubmit: (post: CreatePostData) => void;
+  onSubmit: (post: CreatePostData) => Promise<void>;
+  initialData?: CreatePostData; // 초기 데이터 추가
+  isEdit?: boolean; // 수정 모드 여부
   initialLoading?: boolean;
 }
 
-const PostForm: FC<PostFormProps> = ({ onSubmit, initialLoading = false }) => {
-  const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
-  const [category, setCategory] = useState<PostCategory | null>(null);
+const PostForm: FC<PostFormProps> = ({
+  onSubmit,
+  initialData,
+  isEdit = false,
+  initialLoading = false,
+}) => {
+  const [title, setTitle] = useState(initialData?.title || '');
+  const [content, setContent] = useState(initialData?.content || '');
+  const [category, setCategory] = useState<PostCategory | null>(
+    initialData?.category || null
+  );
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<
     'info' | 'success' | 'warning' | 'error'
   >('warning');
   const [loading, setLoading] = useState(initialLoading);
-  const router = useRouter();
 
   // 키워드 관련 상태
-  const [keywords, setKeywords] = useState<string[]>([]);
+  const [keywords, setKeywords] = useState<string[]>(
+    initialData?.keywords || []
+  );
   const [keywordInput, setKeywordInput] = useState('');
 
   const handleSubmit = async (e: FormEvent) => {
@@ -50,8 +59,7 @@ const PostForm: FC<PostFormProps> = ({ onSubmit, initialLoading = false }) => {
         keywords, // 키워드 배열 추가
       });
 
-      // 카테고리에 따라 해당 페이지로 리다이렉트
-      navigateToCategoryPage(category);
+      // 폼 제출 후 처리는 onSubmit 함수에서 수행
     } catch (error) {
       console.error('게시글 저장 중 오류:', error);
       setToastMessage('게시글 저장 중 오류가 발생했습니다.');
@@ -61,32 +69,7 @@ const PostForm: FC<PostFormProps> = ({ onSubmit, initialLoading = false }) => {
     }
   };
 
-  const navigateToCategoryPage = (category: PostCategory) => {
-    let redirectPath = '/';
-
-    switch (category) {
-      case PostCategory.IDEA:
-        redirectPath = '/category/idea';
-        break;
-      case PostCategory.SENTENCE:
-        redirectPath = '/category/sentence';
-        break;
-      case PostCategory.QUOTE:
-        redirectPath = '/category/quote';
-        break;
-      case PostCategory.VIDEO:
-        redirectPath = '/category/video';
-        break;
-      case PostCategory.OTHER:
-        redirectPath = '/category/other';
-        break;
-    }
-
-    // 게시글 작성 완료 후 해당 카테고리 페이지로 이동
-    setTimeout(() => {
-      router.push(redirectPath);
-    }, 300);
-  };
+  // 카테고리에 따라 해당 페이지로 리다이렉트하는 함수는 onSubmit에서 처리
 
   // 키워드 추가 함수
   const addKeyword = () => {
@@ -133,7 +116,6 @@ const PostForm: FC<PostFormProps> = ({ onSubmit, initialLoading = false }) => {
         onSubmit={handleSubmit}
         className="w-full space-y-4 bg-white shadow rounded-lg p-6"
       >
-        {/* 기존 코드와 동일... */}
         <div>
           <label
             htmlFor="title"
@@ -312,7 +294,7 @@ const PostForm: FC<PostFormProps> = ({ onSubmit, initialLoading = false }) => {
             className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300"
             disabled={loading}
           >
-            {loading ? '저장 중...' : '게시하기'}
+            {loading ? '저장 중...' : isEdit ? '수정하기' : '게시하기'}
           </button>
           <Link
             href="/"
