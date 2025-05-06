@@ -150,7 +150,7 @@ export default function SearchPage() {
 
           // 최신순 정렬 (기본)
           return (
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
           );
         });
     }
@@ -411,7 +411,7 @@ export default function SearchPage() {
                         )}
 
                         <p className="text-gray-500 text-sm mt-2">
-                          {new Date(post.createdAt).toLocaleString('ko-KR')}
+                          {new Date(post.created_at).toLocaleString('ko-KR')}
                         </p>
                       </div>
                     </div>
@@ -487,7 +487,7 @@ export default function SearchPage() {
                 )}
 
                 <p className="text-gray-500 text-sm mt-4">
-                  {new Date(post.createdAt).toLocaleString('ko-KR')}
+                  {new Date(post.created_at).toLocaleString('ko-KR')}
                 </p>
 
                 {/* 항목 구분선 - 마지막 항목 제외 */}

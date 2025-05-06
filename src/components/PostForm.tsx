@@ -12,6 +12,26 @@ interface PostFormProps {
   initialLoading?: boolean;
 }
 
+// 비디오 카테고리 제출 데이터
+interface VideoPostData {
+  title: string;
+  content: string;
+  category: PostCategory.VIDEO;
+  keywords?: string[];
+  video_urls: string[];
+}
+
+// 비디오가 아닌 카테고리 제출 데이터
+interface NonVideoPostData {
+  title: string;
+  content: string;
+  category: Exclude<PostCategory, PostCategory.VIDEO>;
+  keywords?: string[];
+}
+
+// 조합 타입
+type PostSubmitData = VideoPostData | NonVideoPostData;
+
 const PostForm: FC<PostFormProps> = ({
   onSubmit,
   initialData,
@@ -23,6 +43,13 @@ const PostForm: FC<PostFormProps> = ({
   const [category, setCategory] = useState<PostCategory | null>(
     initialData?.category || null
   );
+  const [videoUrls, setVideoUrls] = useState<string[]>(
+    initialData?.category === PostCategory.VIDEO &&
+      Array.isArray(initialData.video_urls)
+      ? initialData.video_urls
+      : []
+  );
+  const [currentVideoUrl, setCurrentVideoUrl] = useState('');
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<
@@ -35,6 +62,64 @@ const PostForm: FC<PostFormProps> = ({
     initialData?.keywords || []
   );
   const [keywordInput, setKeywordInput] = useState('');
+
+  // URL 검증 함수
+  const isValidUrl = (url: string): boolean => {
+    try {
+      new URL(url);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  // 영상 URL 추가
+  const addVideoUrl = () => {
+    if (!currentVideoUrl.trim()) {
+      return;
+    }
+
+    // URL 형식 검증
+    if (!isValidUrl(currentVideoUrl)) {
+      setToastMessage('유효한 URL을 입력해주세요.');
+      setToastType('warning');
+      setShowToast(true);
+      return;
+    }
+
+    // 최대 5개 제한
+    if (videoUrls.length >= 5) {
+      setToastMessage('영상 URL은 최대 5개까지만 추가할 수 있습니다.');
+      setToastType('warning');
+      setShowToast(true);
+      return;
+    }
+
+    // 중복 검사
+    if (videoUrls.includes(currentVideoUrl)) {
+      setToastMessage('이미 추가된 URL입니다.');
+      setToastType('info');
+      setShowToast(true);
+      return;
+    }
+
+    // URL 추가
+    setVideoUrls([...videoUrls, currentVideoUrl]);
+    setCurrentVideoUrl('');
+  };
+
+  // 영상 URL 삭제
+  const removeVideoUrl = (indexToRemove: number) => {
+    setVideoUrls(videoUrls.filter((_, index) => index !== indexToRemove));
+  };
+
+  // URL 입력창에서 엔터 키 처리
+  const handleVideoUrlKeyPress = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault(); // 폼 제출 방지
+      addVideoUrl();
+    }
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -49,17 +134,41 @@ const PostForm: FC<PostFormProps> = ({
       return;
     }
 
+    // 영상 카테고리일 때 URL 필수 입력 검증
+    if (category === PostCategory.VIDEO && videoUrls.length === 0) {
+      setToastMessage('영상 카테고리에는 최소 1개 이상의 URL을 입력해주세요.');
+      setToastType('warning');
+      setShowToast(true);
+      return;
+    }
+
     setLoading(true);
 
     try {
-      await onSubmit({
-        title,
-        content,
-        category: category || PostCategory.OTHER,
-        keywords, // 키워드 배열 추가
-      });
+      // 제출 데이터 준비
+      let postData: PostSubmitData;
 
-      // 폼 제출 후 처리는 onSubmit 함수에서 수행
+      // 영상 카테고리인 경우
+      if (category === PostCategory.VIDEO) {
+        postData = {
+          title,
+          content,
+          category,
+          keywords: keywords.length > 0 ? keywords : undefined,
+          video_urls: videoUrls,
+        };
+      } else {
+        // 영상이 아닌 카테고리
+        postData = {
+          title,
+          content,
+          category,
+          keywords: keywords.length > 0 ? keywords : undefined,
+        };
+      }
+
+      // 제출
+      await onSubmit(postData as CreatePostData);
     } catch (error) {
       console.error('게시글 저장 중 오류:', error);
       setToastMessage('게시글 저장 중 오류가 발생했습니다.');
@@ -68,8 +177,6 @@ const PostForm: FC<PostFormProps> = ({
       setLoading(false);
     }
   };
-
-  // 카테고리에 따라 해당 페이지로 리다이렉트하는 함수는 onSubmit에서 처리
 
   // 키워드 추가 함수
   const addKeyword = () => {
@@ -205,6 +312,93 @@ const PostForm: FC<PostFormProps> = ({
             </button>
           </div>
         </div>
+
+        {/* 영상 카테고리 선택 시 URL 입력 필드 표시 */}
+        {category === PostCategory.VIDEO && (
+          <div className="transition-all duration-300 ease-in-out space-y-4">
+            <div>
+              <div className="flex justify-between">
+                <label className="block text-sm font-medium text-gray-700">
+                  영상 URL (최대 5개)
+                </label>
+                <span className="text-xs text-gray-500">
+                  {videoUrls.length}/5 영상 추가됨
+                </span>
+              </div>
+              <div className="mt-1 flex">
+                <input
+                  type="url"
+                  value={currentVideoUrl}
+                  onChange={(e) => setCurrentVideoUrl(e.target.value)}
+                  onKeyPress={handleVideoUrlKeyPress}
+                  placeholder="https://www.youtube.com/watch?v=..."
+                  className="flex-1 rounded-l-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                  disabled={loading || videoUrls.length >= 5}
+                />
+                <button
+                  type="button"
+                  onClick={addVideoUrl}
+                  className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-r-md text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300"
+                  disabled={
+                    loading || !currentVideoUrl.trim() || videoUrls.length >= 5
+                  }
+                >
+                  추가
+                </button>
+              </div>
+              <p className="mt-1 text-xs text-gray-500">
+                YouTube, Vimeo 등의 영상 URL을 입력하세요. (필수)
+              </p>
+            </div>
+
+            {/* 추가된 영상 URL 목록 */}
+            {videoUrls.length > 0 && (
+              <div className="bg-gray-50 p-3 rounded-md">
+                <h4 className="text-sm font-medium text-gray-700 mb-2">
+                  추가된 영상
+                </h4>
+                <ul className="space-y-2">
+                  {videoUrls.map((url, index) => (
+                    <li
+                      key={index}
+                      className="flex items-center justify-between bg-white p-2 rounded border border-gray-200"
+                    >
+                      <a
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-indigo-600 hover:text-indigo-800 text-sm truncate max-w-[80%]"
+                      >
+                        {url}
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => removeVideoUrl(index)}
+                        className="text-red-500 hover:text-red-700"
+                        disabled={loading}
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-5 w-5"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                          />
+                        </svg>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
 
         <div>
           <label

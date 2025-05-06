@@ -2,7 +2,7 @@
 
 import Toast from '@/components/Toast';
 import { deletePost, getPostById } from '@/lib/api';
-import { Post } from '@/types';
+import { Post, PostCategory } from '@/types';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -21,6 +21,7 @@ export default function PostDetailPage() {
     'info' | 'success' | 'warning' | 'error'
   >('info');
   const [isDeleting, setIsDeleting] = useState(false);
+  const [activeVideoIndex, setActiveVideoIndex] = useState(0);
 
   useEffect(() => {
     async function loadPost() {
@@ -90,6 +91,64 @@ export default function PostDetailPage() {
     }
   };
 
+  // YouTube 영상 ID 추출 함수
+  const getYoutubeVideoId = (url?: string): string | null => {
+    if (!url) return null;
+
+    // YouTube URL 패턴 확인
+    const regExp =
+      /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
+    const match = url.match(regExp);
+
+    return match && match[7].length === 11 ? match[7] : null;
+  };
+
+  // 임베드 가능한 URL인지 확인
+  const isEmbeddableVideo = (url?: string): boolean => {
+    if (!url) return false;
+    return getYoutubeVideoId(url) !== null;
+  };
+
+  // 임베드 HTML 생성
+  const getVideoEmbedHtml = (url?: string): React.ReactNode => {
+    if (!url) return null;
+
+    const youtubeId = getYoutubeVideoId(url);
+    if (youtubeId) {
+      return (
+        <div className="aspect-w-16 aspect-h-9 rounded-lg overflow-hidden">
+          <iframe
+            src={`https://www.youtube.com/embed/${youtubeId}`}
+            title="YouTube video player"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            className="w-full h-full border-0"
+          ></iframe>
+        </div>
+      );
+    }
+
+    return null;
+  };
+
+  // 다중 비디오 URL 처리
+  const getVideoUrls = (): string[] => {
+    if (!post) return [];
+
+    // Post 타입이 VideoPost로 확정된 경우에만 videoUrls에 접근
+    if (post.category === PostCategory.VIDEO && 'videoUrls' in post) {
+      return post.video_urls;
+    }
+
+    return [];
+  };
+
+  // 설명용 짧은 URL
+  const getShortenedUrl = (url: string): string => {
+    const maxLength = 40;
+    return url.length > maxLength ? url.substring(0, maxLength) + '...' : url;
+  };
+
   if (loading) {
     return (
       <div className="w-full max-w-full">
@@ -117,6 +176,8 @@ export default function PostDetailPage() {
       </div>
     );
   }
+
+  const videoUrls = getVideoUrls();
 
   return (
     <div className="w-full max-w-full">
@@ -155,6 +216,79 @@ export default function PostDetailPage() {
           </span>
         </div>
 
+        {/* 영상 URL 및 임베드 표시 (영상 카테고리인 경우) */}
+        {post.category === PostCategory.VIDEO && videoUrls.length > 0 && (
+          <div className="my-4 space-y-4">
+            {/* 현재 활성화된 영상 임베드 */}
+            {isEmbeddableVideo(videoUrls[activeVideoIndex]) ? (
+              // 임베드 지원되는 영상
+              getVideoEmbedHtml(videoUrls[activeVideoIndex])
+            ) : (
+              // 임베드 지원되지 않는 영상은 링크만 표시
+              <a
+                href={videoUrls[activeVideoIndex]}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-indigo-600 hover:text-indigo-800 flex items-center py-3 px-4 border border-gray-200 rounded-lg"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-5 w-5 mr-2"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                  />
+                </svg>
+                영상 보기: {getShortenedUrl(videoUrls[activeVideoIndex])}
+              </a>
+            )}
+
+            {/* 다중 영상 선택 버튼들 (2개 이상 있을 때만 표시) */}
+            {videoUrls.length > 1 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {videoUrls.map((url, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setActiveVideoIndex(index)}
+                    className={`px-3 py-1 text-sm rounded-full ${
+                      index === activeVideoIndex
+                        ? 'bg-indigo-100 text-indigo-700 ring-1 ring-indigo-300'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    영상 {index + 1}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* 모든 영상 URL 표시 */}
+            <div className="mt-2 space-y-2">
+              {videoUrls.map((url, index) => (
+                <a
+                  key={index}
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`block text-sm ${
+                    index === activeVideoIndex
+                      ? 'text-indigo-600 font-medium'
+                      : 'text-gray-600'
+                  } hover:text-indigo-800`}
+                >
+                  {index + 1}. {url}
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="text-gray-800 mb-6 whitespace-pre-wrap leading-relaxed">
           {post.content}
         </div>
@@ -174,9 +308,7 @@ export default function PostDetailPage() {
         )}
 
         <p className="text-gray-500 text-sm mt-4">
-          {new Date(post.created_at || post.createdAt || '').toLocaleString(
-            'ko-KR'
-          )}
+          {new Date(post.created_at || '').toLocaleString('ko-KR')}
         </p>
       </div>
 

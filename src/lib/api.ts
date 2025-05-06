@@ -35,19 +35,44 @@ export async function getPostsByCategory(category: PostCategory): Promise<Post[]
 }
 
 // 게시글 생성하기
-export async function createPost(postData: CreatePostData): Promise<Post | null> {
-  const { data, error } = await supabase
-    .from('posts')
-    .insert([postData])
-    .select()
-    .single();
+export async function createPost(postData: CreatePostData): Promise<{post: Post | null, redirectUrl: string}> {
+  try {
+    const { data, error } = await supabase
+      .from('posts')
+      .insert([postData])
+      .select()
+      .single();
 
-  if (error) {
-    console.error('Error creating post:', error);
-    return null;
-  }
-
-  return formatPostForClient(data);
+    if (error) {
+      console.error('Error creating post:', error);
+      throw error;
+    }
+    
+    // 카테고리에 따른 리디렉션 URL 설정
+    let redirectUrl = '/';
+    if (postData.category === PostCategory.VIDEO) {
+      redirectUrl = '/category/video';
+    } else if (postData.category === PostCategory.IDEA) {
+      redirectUrl = '/category/idea';
+    } else if (postData.category === PostCategory.SENTENCE) {
+      redirectUrl = '/category/sentence';
+    } else if (postData.category === PostCategory.QUOTE) {
+      redirectUrl = '/category/quote';
+    } else if (postData.category === PostCategory.OTHER) {
+      redirectUrl = '/category/other';
+    }
+    
+    // data가 존재하는지 확인
+    if (!data) {
+      console.error('No data returned after insert');
+      return { post: null, redirectUrl };
+    }
+    
+    return { post: formatPostForClient(data), redirectUrl };
+  } catch (error) {
+    console.error('생성 오류:', error);
+    throw error;
+  } 
 }
 
 // 게시글 삭제하기

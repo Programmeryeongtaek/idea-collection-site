@@ -166,8 +166,8 @@ export default function SearchPage() {
 
           // 최신순 정렬 (기본)
           // created_at 또는 createdAt 속성 중 하나를 사용
-          const dateA = a.created_at || a.createdAt || '';
-          const dateB = b.created_at || b.createdAt || '';
+          const dateA = a.created_at || '';
+          const dateB = b.created_at || '';
           return new Date(dateB).getTime() - new Date(dateA).getTime();
         });
     }
@@ -458,7 +458,7 @@ export default function SearchPage() {
                         )}
 
                         <p className="text-gray-500 text-sm mt-2">
-                          {formatDate(post.created_at || post.createdAt)}
+                          {formatDate(post.created_at)}
                         </p>
                       </div>
                     </div>
@@ -521,7 +521,7 @@ export default function SearchPage() {
                 )}
 
                 <p className="text-gray-500 text-sm mt-4">
-                  {formatDate(post.created_at || post.createdAt)}
+                  {formatDate(post.created_at)}
                 </p>
 
                 {/* 항목 구분선 - 마지막 항목 제외 */}

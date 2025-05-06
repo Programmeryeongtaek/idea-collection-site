@@ -4,20 +4,26 @@ import PostForm from '@/components/PostForm';
 import Toast from '@/components/Toast';
 import { createPost } from '@/lib/api';
 import { CreatePostData } from '@/types';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 export default function CreatePostPage() {
+  const router = useRouter();
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<
     'info' | 'success' | 'warning' | 'error'
   >('info');
+  const [loading, setLoading] = useState(false);
 
   const handleCreatePost = async (postData: CreatePostData) => {
-    try {
-      const newPost = await createPost(postData);
+    setLoading(true);
 
-      if (!newPost) {
+    try {
+      // 리디렉션 정보를 함께 받는 새로운 API 호출
+      const result = await createPost(postData);
+
+      if (!result.post) {
         throw new Error('게시글 저장에 실패했습니다.');
       }
 
@@ -26,20 +32,23 @@ export default function CreatePostPage() {
       setToastType('success');
       setShowToast(true);
 
-      // 리다이렉트는 PostForm 컴포넌트에서 처리
+      // 토스트 메시지 표시 후 리디렉션 추가
+      setTimeout(() => {
+        router.push(result.redirectUrl);
+      }, 1000); // 1초 후 리디렉션
     } catch (error) {
       console.error('게시글 생성 오류:', error);
       setToastMessage('게시글을 저장하는 중 오류가 발생했습니다.');
       setToastType('error');
       setShowToast(true);
-      throw error; // 에러를 다시 던져 PostForm에서 처리하게 함
+      setLoading(false);
     }
   };
 
   return (
     <div className="w-full max-w-full">
       <h1 className="text-2xl font-bold mb-6">새 게시글 작성</h1>
-      <PostForm onSubmit={handleCreatePost} />
+      <PostForm onSubmit={handleCreatePost} initialLoading={loading} />
 
       {/* 토스트 메시지 */}
       <Toast

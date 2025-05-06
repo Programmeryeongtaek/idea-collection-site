@@ -130,6 +130,11 @@ export default function PostList({ category }: PostListProps) {
     setIsMultiSelectMode(!isMultiSelectMode);
   };
 
+  // 날짜 포맷 함수
+  const formatDate = (date: string): string => {
+    return new Date(date).toLocaleString('ko-KR');
+  };
+
   if (loading) {
     return (
       <div className="bg-white rounded-lg shadow p-6 text-center w-full">
@@ -246,9 +251,7 @@ export default function PostList({ category }: PostListProps) {
                 )}
 
                 <p className="text-gray-500 text-sm mt-2">
-                  {new Date(
-                    post.created_at || post.createdAt || ''
-                  ).toLocaleString('ko-KR')}
+                  {formatDate(post.created_at)}
                 </p>
               </Link>
             </div>
