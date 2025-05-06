@@ -45,6 +45,7 @@ const PostForm: FC<PostFormProps> = ({
   );
   const [videoUrls, setVideoUrls] = useState<string[]>(
     initialData?.category === PostCategory.VIDEO &&
+      'video_urls' in initialData &&
       Array.isArray(initialData.video_urls)
       ? initialData.video_urls
       : []

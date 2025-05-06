@@ -3,7 +3,7 @@
 import PostForm from '@/components/PostForm';
 import Toast from '@/components/Toast';
 import { getPostById, updatePost } from '@/lib/api';
-import { CreatePostData, Post } from '@/types';
+import { CreatePostData, Post, PostCategory } from '@/types';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
@@ -121,6 +121,9 @@ export default function EditPostPage() {
     content: post.content,
     category: post.category,
     keywords: post.keywords || [],
+    ...(post.category === PostCategory.VIDEO && 'video_urls' in post
+      ? { video_urls: post.video_urls }
+      : {}),
   };
 
   return (
