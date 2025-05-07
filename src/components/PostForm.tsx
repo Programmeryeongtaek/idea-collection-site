@@ -71,9 +71,65 @@ const PostForm: FC<PostFormProps> = ({
   );
   const [keywordInput, setKeywordInput] = useState('');
 
+  // 도서 형식인지 감지하는 함수
+  const isBookFormat = (content: string): boolean => {
+    // p. 숫자 형식으로 시작하는 줄이 있는지 확인
+    const bookPattern = /^p\.\d+\s*\n/m;
+    return bookPattern.test(content);
+  };
+
+  // 문장 형식 감지 및 설정
+  const initialSentenceType: SentenceType =
+    initialData?.category === PostCategory.SENTENCE &&
+    isBookFormat(initialData.content)
+      ? 'book'
+      : 'general';
+
+  // 문장 파싱 함수
+  const parseContentToSentences = (content: string): SentenceItem[] => {
+    if (!content.trim()) return [];
+
+    // 도서 형식인 경우
+    if (isBookFormat(content)) {
+      //빈 줄로 문장 구분하기
+      const paragraphs = content.split(/\n\s*\n/);
+      return paragraphs.map((paragraph) => {
+        // 페이지 번호와 문장 내용 분리
+        const match = paragraph.match(/^p\.(\d+)\s*\n([\s\S]*)/);
+        if (match) {
+          const [, pageStr, text] = match;
+          return {
+            id:
+              Date.now().toString + Math.random().toString(36).substring(2, 9),
+            text: text.trim(),
+            page: parseInt(pageStr, 10),
+          };
+        }
+        // 일반 문장인 경우
+        return {
+          id:
+            Date.now().toString() + Math.random().toString(36).substring(2, 9),
+          text: paragraph.trim(),
+        };
+      });
+    } else {
+      // 일반 형식인 경우
+      const paragraphs = content.split(/\n\s*\n/);
+      return paragraphs.map((paragraph) => ({
+        id: Date.now().toString + Math.random().toString(36).substring(2, 9),
+        text: paragraph.trim(),
+      }));
+    }
+  };
+
   // 문장 관련 새로운 상태
-  const [sentenceType, setSentenceType] = useState<SentenceType>('general');
-  const [sentences, setSentences] = useState<SentenceItem[]>([]);
+  const [sentenceType, setSentenceType] =
+    useState<SentenceType>(initialSentenceType);
+  const [sentences, setSentences] = useState<SentenceItem[]>(
+    initialData?.category === PostCategory.SENTENCE
+      ? parseContentToSentences(initialData.content)
+      : []
+  );
   const [currentSentence, setCurrentSentence] = useState('');
   const [currentPage, setCurrentPage] = useState<string>('');
 
@@ -187,7 +243,7 @@ const PostForm: FC<PostFormProps> = ({
     return sentences
       .map((item) => {
         if (sentenceType === 'book' && item.page) {
-          return `p.${item.page} \n${item.text}`;
+          return `p.${item.page}\n${item.text}`;
         }
         return item.text;
       })
@@ -642,7 +698,8 @@ const PostForm: FC<PostFormProps> = ({
         )}
 
         {/* 문장 카테고리가 아니거나 문장을 추가하지 않은 경우에만 내용 입력 필드 표시 */}
-        {(category !== PostCategory.SENTENCE || sentences.length === 0) && (
+        {(category !== PostCategory.SENTENCE ||
+          (category === PostCategory.SENTENCE && sentences.length === 0)) && (
           <div>
             <label
               htmlFor="content"
