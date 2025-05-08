@@ -184,7 +184,7 @@ const PostForm: FC<PostFormProps> = ({
   };
 
   // URL 입력창에서 엔터 키 처리
-  const handleVideoUrlKeyPress = (e: KeyboardEvent<HTMLInputElement>) => {
+  const handleVideoUrlKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault(); // 폼 제출 방지
       addVideoUrl();
@@ -231,7 +231,7 @@ const PostForm: FC<PostFormProps> = ({
   };
 
   // 문장 입력창에서 엔터 키 처리
-  const handleSentenceKeyPress = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleSentenceKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && e.ctrlKey) {
       e.preventDefault(); // 폼 제출 방지
       addSentence();
@@ -508,7 +508,7 @@ const PostForm: FC<PostFormProps> = ({
                       placeholder="문장을 입력하세요 (Ctrl+Enter로 추가)"
                       value={currentSentence}
                       onChange={(e) => setCurrentSentence(e.target.value)}
-                      onKeyPress={handleSentenceKeyPress}
+                      onKeyDown={handleSentenceKeyDown}
                       className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                       rows={2}
                       disabled={loading}
@@ -534,7 +534,7 @@ const PostForm: FC<PostFormProps> = ({
                       placeholder="문장을 입력하세요 (Ctrl+Enter로 추가)"
                       value={currentSentence}
                       onChange={(e) => setCurrentSentence(e.target.value)}
-                      onKeyPress={handleSentenceKeyPress}
+                      onKeyDown={handleSentenceKeyDown}
                       className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                       rows={2}
                       disabled={loading}
@@ -627,7 +627,7 @@ const PostForm: FC<PostFormProps> = ({
                   type="url"
                   value={currentVideoUrl}
                   onChange={(e) => setCurrentVideoUrl(e.target.value)}
-                  onKeyPress={handleVideoUrlKeyPress}
+                  onKeyDown={handleVideoUrlKeyDown}
                   placeholder="https://www.youtube.com/watch?v=..."
                   className="flex-1 rounded-l-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                   disabled={loading || videoUrls.length >= 5}

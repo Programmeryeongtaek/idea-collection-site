@@ -17,7 +17,7 @@ export async function migrateLocalStorageToSupabase() {
       content: post.content,
       category: post.category,
       keywords: post.keywords || [],
-      created_at: post.createdAt, // Supabase 컬럼명과 일치시킴
+      created_at: post.created_at,
     }));
 
     // Supabase에 데이터 저장

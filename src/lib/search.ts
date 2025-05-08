@@ -2,6 +2,7 @@ import { Post } from '@/types';
 import { supabase } from './supabase';
 import { formatPostForClient } from '@/utils/data';
 
+
 export interface SearchResult {
   titleResults: Post[];
   keywordResults: Post[];
@@ -69,8 +70,11 @@ export async function searchWithMultipleTerms(searchTerms: string[]): Promise<Se
 
       // 중복 제거하며 결과 추가
       result.data.forEach((post) => {
-        if (!titleResults.some(p => p.id === post.id)) {
-          titleResults.push(formatPostForClient(post));
+        if (post && !titleResults.some((p) => p.id === post.id)) {
+          const formattedPost = formatPostForClient(post);
+          if (formattedPost) {
+            titleResults.push(formattedPost);
+          }
         }
       });
     });
@@ -84,8 +88,11 @@ export async function searchWithMultipleTerms(searchTerms: string[]): Promise<Se
 
       // 중복 제거하며 결과 추가 (제목 결과와도 중복 제거)
       result.data.forEach((post) => {
-        if (!contentResults.some(p => p.id === post.id) && !titleResults.some(p => p.id === post.id)) {
-          contentResults.push(formatPostForClient(post));
+        if (post && !contentResults.some(p => p.id === post.id) && !titleResults.some(p => p.id === post.id)) {
+          const formattedPost = formatPostForClient(post);
+          if (formattedPost) {
+            contentResults.push(formattedPost);
+          }
         }
       });
     });
@@ -99,10 +106,13 @@ export async function searchWithMultipleTerms(searchTerms: string[]): Promise<Se
 
       // 중복 제거하며 결과 추가
       result.data.forEach((post) => {
-        if (!keywordResults.some(p => p.id === post.id) && 
+        if (post && !keywordResults.some(p => p.id === post.id) && 
             !titleResults.some(p => p.id === post.id) && 
             !contentResults.some(p => p.id === post.id)) {
-          keywordResults.push(formatPostForClient(post));
+          const formattedPost = formatPostForClient(post);
+          if (formattedPost) {
+            keywordResults.push(formattedPost);
+          }
         }
       });
     });

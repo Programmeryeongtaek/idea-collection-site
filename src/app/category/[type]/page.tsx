@@ -12,8 +12,10 @@ const validCategories = {
   other: PostCategory.OTHER,
 };
 
-export default function CategoryPage({ params }: { params: { type: string } }) {
-  const { type } = params;
+type Params = Promise<{ type: string }>;
+
+export default async function CategoryPage(props: { params: Params }) {
+  const { type } = await props.params;
 
   if (!Object.keys(validCategories).includes(type)) {
     return notFound();
