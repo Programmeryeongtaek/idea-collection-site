@@ -12,13 +12,8 @@ const validCategories = {
   other: PostCategory.OTHER,
 };
 
-export default async function CategoryPage({
-  params,
-}: {
-  params: { type: string };
-}) {
-  // params 객체를 await로 비동기 접근
-  const { type } = await params;
+export default function CategoryPage({ params }: { params: { type: string } }) {
+  const { type } = params;
 
   if (!Object.keys(validCategories).includes(type)) {
     return notFound();
