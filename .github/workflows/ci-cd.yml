@@ -57,3 +57,5 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           vercel-args: '--prod'
           working-directory: ./
+          // TODO: 조건부로 적용할 것
+          github-comment: false
